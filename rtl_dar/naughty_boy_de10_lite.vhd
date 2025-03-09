@@ -125,7 +125,12 @@ architecture struct of naughty_boy_de10_lite is
  alias ps2_dat         : std_logic is gpio(34); --gpio(1);
  alias pwm_audio_out_l : std_logic is gpio(1);  --gpio(2);
  alias pwm_audio_out_r : std_logic is gpio(3);  --gpio(3);
-   
+
+ signal video_15kHz : std_logic_vector(5 downto 0);
+ signal ce_pix      : std_logic;
+ signal video_31kHz : std_logic_vector(5 downto 0);
+ signal hsync_31kHz : std_logic;
+ 
 -- signal dbg_cpu_addr : std_logic_vector(15 downto 0);
 
 begin
@@ -154,7 +159,7 @@ port map(
  clock_50     => max10_clk1_50,
  clock_12     => clk12,
  reset        => reset,
- tv15kHz_mode => tv15kHz_mode,
+ --tv15kHz_mode => tv15kHz_mode,
  dip_switch   => sw(7 downto 0),
  coin         => coin,
  starts       => starts,
@@ -165,21 +170,33 @@ port map(
  video_b      => b,
  video_csync  => csync,
  video_hs     => hsync,
- video_vs     => vsync
+ video_vs     => vsync,
+ ce_pix       => ce_pix
 -- audio_select => "000", --audio_select,
 -- audio        => audio
 );
 
+-- line doubler
+video_15kHz <= r & g & b;
+
+doubler : entity work.line_doubler
+port map(
+	clock   => clk12,
+	ena_pix => ce_pix,
+	video_i => video_15kHz,
+	hsync_i => hsync,
+	video_o => video_31kHz,
+	hsync_o => hsync_31kHz
+);
+
 -- adapt video to 4bits/color only
-vga_r <= r&"00";
-vga_g <= g&"00";
-vga_b <= b&"00";
+vga_r <= r&"00" when tv15kHz_mode = '1' else video_31kHz(5 downto 4)&"00";
+vga_g <= g&"00" when tv15kHz_mode = '1' else video_31kHz(3 downto 2)&"00";
+vga_b <= b&"00" when tv15kHz_mode = '1' else video_31kHz(1 downto 0)&"00";
 
 -- synchro composite/ synchro horizontale
---vga_hs <= csync;
-vga_hs <= csync when tv15kHz_mode = '1' else hsync;
+vga_hs <= csync when tv15kHz_mode = '1' else hsync_31kHz;
 -- commutation rapide / synchro verticale
---vga_vs <= '1';
 vga_vs <= '1'   when tv15kHz_mode = '1' else vsync;
 
 

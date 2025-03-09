@@ -13,7 +13,6 @@ port(
  clock_50     : in std_logic;
  clock_12     : in std_logic;
  reset        : in std_logic;
- tv15kHz_mode : in std_logic;
  dip_switch   : in std_logic_vector(7 downto 0);
  coin         : in std_logic;
  starts       : in std_logic_vector(1 downto 0);
@@ -24,7 +23,10 @@ port(
  video_b      : out std_logic_vector(1 downto 0);
  video_csync  : out std_logic;
  video_hs     : out std_logic;
- video_vs     : out std_logic
+ video_vs     : out std_logic;
+ video_hblank : out std_logic;
+ video_vblank : out std_logic; 
+ ce_pix       : inout std_logic
 -- audio_select : in std_logic_vector(2 downto 0);
 -- audio        : out std_logic_vector(11 downto 0)
 );
@@ -46,7 +48,7 @@ architecture struct of naughty_boy is
  signal cpu_wait      : std_logic; 
  signal sel_cpu_addr  : std_logic; 
  signal sel_scrl_addr : std_logic;  
- signal clr_vid       : std_logic;
+ signal hblank        : std_logic;
  signal vblank        : std_logic;
   
  signal cpu_ena  : std_logic;
@@ -111,9 +113,6 @@ architecture struct of naughty_boy is
  
  signal coin_n   : std_logic;
  signal buttons  : std_logic_vector(4 downto 0);
-
- signal video_15kHz : std_logic_vector(5 downto 0);
- signal video_31kHz : std_logic_vector(5 downto 0);
  
 begin
 
@@ -138,11 +137,11 @@ port map(
  hcnt     => hcnt,
  vcnt     => vcnt,
  ena_pix  => ena_pix,
- hsync    => hsync,
- vsync    => vsync,
+ hsync    => video_hs,
+ vsync    => video_vs,
  csync    => video_csync,
  cpu_wait => cpu_wait,
- clr_vid  => clr_vid,
+ hblank   => hblank,
  vblank   => vblank,
  sel_cpu_addr  => sel_cpu_addr,
  sel_scrl_addr => sel_scrl_addr
@@ -152,6 +151,8 @@ port map(
 clock_12n<= not clock_12;
 reset_n  <= not reset;
 rdy      <= not cpu_wait;
+ce_pix   <= ena_pix;
+
 
 coin_n   <= not coin;
 buttons  <= player1_btns when player2 = '0' else player2_btns;
@@ -196,7 +197,7 @@ cpu_di <= prog_do      when cpu_adr(15 downto 14) = "00" else
           frgnd_ram_do when cpu_adr(15 downto 11) = "10000" else
           bkgnd_ram_do when cpu_adr(15 downto 11) = "10001" else
 			 buttons&'0'&starts when cpu_adr(15 downto 11) = "10110" else
-			 vblank & dip_switch(6 downto 0) when cpu_adr(15 downto 11) = "10111" else
+			 not(vblank) & dip_switch(6 downto 0) when cpu_adr(15 downto 11) = "10111" else
 			 x"FF";
 
 -- write enable to RAMs from cpu
@@ -264,7 +265,7 @@ process (clock_12)
 begin
 	if rising_edge(clock_12) then
 		if ena_pix = '1' then
-			if clr_vid = '0' then
+			if (hblank = '0' and vblank = '0') then
 				fr_bit0 <= frgnd_bit0_graph(to_integer(unsigned(hcnt_s))); 
 				fr_bit1 <= frgnd_bit1_graph(to_integer(unsigned(hcnt_s))); 
 				bk_bit0 <= bkgnd_bit0_graph(to_integer(unsigned(hcnt_s))); 
@@ -284,29 +285,17 @@ end process;
 ---- select pixel bits and palette_id with foreground priority
 color_id  <=  (fr_bit0 or fr_bit1) &  fr_bit1 & fr_bit0 & fr_lin when (fr_bit0 or fr_bit1) = '1' else
               (fr_bit0 or fr_bit1) &  bk_bit1 & bk_bit0 & bk_lin;
---
----- address palette with pixel bits color and color set
+
+-- address palette with pixel bits color and color set
 palette_adr <= color_set & color_id;
---
----- output video to top level
-video_vs <= '0' when (vcnt > 235) and (vcnt < 240) else '1';
 
-video_15kHz <= rgb_1(0) & rgb_0(0) & rgb_1(2) & rgb_0(2) & rgb_1(1) & rgb_0(1);
+-- output video to top level
+video_r <= rgb_1(0) & rgb_0(0);
+video_g <= rgb_1(2) & rgb_0(2);
+video_b <= rgb_1(1) & rgb_0(1);
 
-video_r <= rgb_1(0) & rgb_0(0) when tv15kHz_mode = '1' else video_31kHz(5 downto 4);
-video_g <= rgb_1(2) & rgb_0(2) when tv15kHz_mode = '1' else video_31kHz(3 downto 2);
-video_b <= rgb_1(1) & rgb_0(1) when tv15kHz_mode = '1' else video_31kHz(1 downto 0);
-
--- line doubler
-doubler : entity work.line_doubler
-port map(
-	clock   => clock_12,
-	ena_pix => ena_pix,
-	video_i => video_15kHz,
-	hsync_i => hsync,
-	video_o => video_31kHz,
-	hsync_o => video_hs
-);
+video_hblank <= hblank;
+video_vblank <= vblank;
 
 -- foreground graphix ROM bit0
 frgnd_bit0 : entity work.prom_graphx_2_bit0

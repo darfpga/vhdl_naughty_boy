@@ -128,7 +128,12 @@ architecture struct of naughty_boy_de1_soc is
  signal pwm_accumulator : std_logic_vector(12 downto 0);
 
  alias reset_n         : std_logic is key(0);
-   
+
+ signal video_15kHz : std_logic_vector(5 downto 0);
+ signal ce_pix      : std_logic;
+ signal video_31kHz : std_logic_vector(5 downto 0);
+ signal hsync_31kHz : std_logic;
+ 
 -- signal dbg_cpu_addr : std_logic_vector(15 downto 0);
 
 begin
@@ -145,13 +150,12 @@ port map(
  locked   => open      --  locked.export
 );
 
-
 naughty_boy : entity work.naughty_boy
 port map(
  clock_50     => clock_50,
  clock_12     => clk12,
  reset        => reset,
- tv15kHz_mode => tv15kHz_mode,
+-- tv15kHz_mode => tv15kHz_mode,
  dip_switch   => sw(7 downto 0),
  coin         => coin,
  starts       => starts,
@@ -162,26 +166,39 @@ port map(
  video_b      => b,
  video_csync  => csync,
  video_hs     => hsync,
- video_vs     => vsync
+ video_vs     => vsync,
+ ce_pix       => ce_pix
 -- audio_select => "000", --audio_select,
 -- audio        => audio
 );
 
+
+-- line doubler
+video_15kHz <= r & g & b;
+
+doubler : entity work.line_doubler
+port map(
+	clock   => clk12,
+	ena_pix => ce_pix,
+	video_i => video_15kHz,
+	hsync_i => hsync,
+	video_o => video_31kHz,
+	hsync_o => hsync_31kHz
+);
+
 -- adapt video to 4bits/color only
-vga_r <= r&"000000";
-vga_g <= g&"000000";
-vga_b <= b&"000000";
+vga_r <= r&"000000" when tv15kHz_mode = '1' else video_31kHz(5 downto 4)&"000000";
+vga_g <= g&"000000" when tv15kHz_mode = '1' else video_31kHz(3 downto 2)&"000000";
+vga_b <= b&"000000" when tv15kHz_mode = '1' else video_31kHz(1 downto 0)&"000000";
 
 -- synchro composite/ synchro horizontale
---vga_hs <= csync;
-vga_hs <= csync when tv15kHz_mode = '1' else hsync;
+vga_hs <= csync when tv15kHz_mode = '1' else hsync_31kHz;
 -- commutation rapide / synchro verticale
---vga_vs <= '1';
 vga_vs <= '1'   when tv15kHz_mode = '1' else vsync;
 
 vga_blank_n <= '1';
-vga_sync_n <= '0';
-vga_clk <= clk12;
+vga_sync_n  <= '0';
+vga_clk     <= clk12;
 
 -- get scancode from keyboard
 keyboard : entity work.io_ps2_keyboard
