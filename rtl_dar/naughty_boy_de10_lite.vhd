@@ -28,9 +28,44 @@
 -- Board key :
 --   0 : reset game
 --
--- Board switch : 
---  sw(7 downto 0) : dipswitch
---  sw(9)          : 15/31kHz select
+-- Board switch : sw(7 downto 0)
+-- --------------------------------------------------------
+--|Option |Factory|Descrpt| 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+-- ------------------------|-------------------------------
+--|Lives  |       |2      |on |on |   |   |   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |   X   |3      |off|on |   |   |   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |       |4      |on |off|   |   |   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |       |5      |off|off|   |   |   |   |   |   |
+-- ------------------------ -------------------------------
+--|Extra  |       |10000  |   |   |on |on |   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |   X   |30000  |   |   |off|on |   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |       |50000  |   |   |on |off|   |   |   |   |
+-- ------------------------ -------------------------------
+--|       |       |70000  |   |   |off|off|   |   |   |   |
+-- ------------------------ -------------------------------
+--|Credits|       |2c, 1p |   |   |   |   |on |on |   |   |
+-- ------------------------ -------------------------------
+--|       |   X   |1c, 1p |   |   |   |   |off|on |   |   |
+-- ------------------------ -------------------------------
+--|       |       |1c, 2p |   |   |   |   |on |off|   |   |
+-- ------------------------ -------------------------------
+--|       |       |4c, 3p |   |   |   |   |off|off|   |   |
+-- ------------------------ -------------------------------
+--|Dffclty|   X   |Easier |   |   |   |   |   |   |on |   |
+-- ------------------------ -------------------------------
+--|       |       |Harder |   |   |   |   |   |   |off|   |
+-- ------------------------ -------------------------------
+--| Type  |       |Upright|   |   |   |   |   |   |   |on |
+-- ------------------------ -------------------------------
+--|       |       |Cktail |   |   |   |   |   |   |   |off|
+-- ------------------------ -------------------------------
+--
+--  sw(9) : 15/31kHz select
 --
 -- Other details : see phoenix.vhd
 -- For USB inputs and SGT5000 audio output see my other project: xevious_de10_lite
@@ -132,6 +167,7 @@ architecture struct of naughty_boy_de10_lite is
  signal hsync_31kHz : std_logic;
  
 -- signal dbg_cpu_addr : std_logic_vector(15 downto 0);
+ signal debug : std_logic_vector(15 downto 0);
 
 begin
 
@@ -159,8 +195,8 @@ port map(
  clock_50     => max10_clk1_50,
  clock_12     => clk12,
  reset        => reset,
- --tv15kHz_mode => tv15kHz_mode,
  dip_switch   => sw(7 downto 0),
+ flip_screen  => sw(8),
  coin         => coin,
  starts       => starts,
  player1_btns => buttons,
@@ -171,9 +207,8 @@ port map(
  video_csync  => csync,
  video_hs     => hsync,
  video_vs     => vsync,
- ce_pix       => ce_pix
--- audio_select => "000", --audio_select,
--- audio        => audio
+ ce_pix       => ce_pix,
+ audio        => audio
 );
 
 -- line doubler
@@ -193,6 +228,10 @@ port map(
 vga_r <= r&"00" when tv15kHz_mode = '1' else video_31kHz(5 downto 4)&"00";
 vga_g <= g&"00" when tv15kHz_mode = '1' else video_31kHz(3 downto 2)&"00";
 vga_b <= b&"00" when tv15kHz_mode = '1' else video_31kHz(1 downto 0)&"00";
+
+--vga_r <= r&"00";
+--vga_g <= g&"00";
+--vga_b <= b&"00";
 
 -- synchro composite/ synchro horizontale
 vga_hs <= csync when tv15kHz_mode = '1' else hsync_31kHz;
@@ -221,16 +260,19 @@ port map (
 
 -- joystick to inputs
 coin        <= not JoyPCFRLDU(7); -- F3 : Add coin
-starts(1)   <= not JoyPCFRLDU(6); -- F2 : Start 2 Players
-starts(0)   <= not JoyPCFRLDU(5); -- F1 : Start 1 Player
-buttons(0)  <= not JoyPCFRLDU(4); -- SPACE : Fire
-buttons(3)  <= not JoyPCFRLDU(3); -- RIGHT arrow : Right
-buttons(4)  <= not JoyPCFRLDU(2); -- LEFT arrow  : Left
-buttons(2)  <= not JoyPCFRLDU(1); -- DOWN arrow  : Down
-buttons(1)  <= not JoyPCFRLDU(0); -- UP arrow    : Up
+starts(1)   <= JoyPCFRLDU(6); -- F2 : Start 2 Players
+starts(0)   <= JoyPCFRLDU(5); -- F1 : Start 1 Player
+buttons(0)  <= JoyPCFRLDU(4); -- SPACE : Fire
+buttons(3)  <= JoyPCFRLDU(3); -- RIGHT arrow : Right
+buttons(4)  <= JoyPCFRLDU(2); -- LEFT arrow  : Left
+buttons(2)  <= JoyPCFRLDU(1); -- DOWN arrow  : Down
+buttons(1)  <= JoyPCFRLDU(0); -- UP arrow    : Up
+
 -- debug display
 
 ledr(8 downto 0) <= "101010101";
+--ledr(8 downto 0) <= '1'&debug(7 downto 0);
+
 --
 --h0 : entity work.decodeur_7_seg port map(dbg_cpu_addr( 3 downto  0),hex0);
 --h1 : entity work.decodeur_7_seg port map(dbg_cpu_addr( 7 downto  4),hex1);

@@ -53,7 +53,7 @@ begin
 -- -----------------------------------------------------------------------
 -- Signals to entity interface
 -- -----------------------------------------------------------------------
---	q <= qReg;
+	q <= qReg;
 
 -- -----------------------------------------------------------------------
 -- Memory write
@@ -75,10 +75,8 @@ process(clk)
 		if rising_edge(clk) then
 --			qReg <= ram(to_integer(unsigned(rAddrReg)));
 --			rAddrReg <= addr;
-----			qReg <= ram(to_integer(unsigned(addr)));
-      q <= ram(to_integer(unsigned(addr)));
+			qReg <= ram(to_integer(unsigned(addr)));
 		end if;
 	end process;
---q <= ram(to_integer(unsigned(addr)));
 end architecture;
 
